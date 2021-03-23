@@ -13,3 +13,5 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+config/setting.json
+update/v2ray-windows-64.zip
