@@ -1,0 +1,10 @@
+{
+  "servers": [
+    {
+      "addr": ":80",
+      "dav": {
+        "enable": false
+      }
+    }
+  ]
+}
