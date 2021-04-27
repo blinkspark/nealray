@@ -11,6 +11,7 @@ func GenDefaultConfig() {
 		Servers: []ServerConfig{
 			{
 				Addr: ":80",
+				Root: ".",
 			},
 		},
 	}

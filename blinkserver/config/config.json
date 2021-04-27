@@ -1,7 +1,13 @@
 {
   "servers": [
     {
-      "addr": ":80"
+      "addr": ":8080",
+      "root": ".",
+      "disable_listing": true
+    },
+    {
+      "addr": ":8888",
+      "to": "http://localhost:8080"
     }
   ]
 }

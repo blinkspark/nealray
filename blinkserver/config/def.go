@@ -5,12 +5,13 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Addr   string      `json:"addr,omitempty"`
-	Root   string      `json:"root,omitempty"`
-	To     string      `json:"to,omitempty"`
-	Cert   string      `json:"cert,omitempty"`
-	Key    string      `json:"key,omitempty"`
-	WebDAV []DavConfig `json:"webdav,omitempty"`
+	Addr           string      `json:"addr,omitempty"`
+	Root           string      `json:"root,omitempty"`
+	DisableListing bool        `json:"disable_listing,omitempty"`
+	To             string      `json:"to,omitempty"`
+	Cert           string      `json:"cert,omitempty"`
+	Key            string      `json:"key,omitempty"`
+	WebDAV         []DavConfig `json:"webdav,omitempty"`
 }
 
 type DavConfig struct {
