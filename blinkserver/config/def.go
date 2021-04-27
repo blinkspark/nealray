@@ -11,12 +11,12 @@ type ServerConfig struct {
 	To             string      `json:"to,omitempty"`
 	Cert           string      `json:"cert,omitempty"`
 	Key            string      `json:"key,omitempty"`
-	WebDAV         []DavConfig `json:"webdav,omitempty"`
+	WebDAVs        []DavConfig `json:"webdavs,omitempty"`
 }
 
 type DavConfig struct {
-	Enable        bool      `json:"enable,omitempty"`
 	Root          string    `json:"root,omitempty"`
+	Prefix        string    `json:"prefix,omitempty"`
 	AccessControl bool      `json:"access_control,omitempty"`
 	Users         []DavUser `json:"users,omitempty"`
 }

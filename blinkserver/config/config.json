@@ -6,6 +6,21 @@
       "disable_listing": true
     },
     {
+      "addr": ":8090",
+      "webdavs": [
+        {
+          "root": ".",
+          "prefix": "/",
+          "users": [
+            {
+              "user": "neal",
+              "password": "123456"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "addr": ":8888",
       "to": "http://localhost:8080"
     }

@@ -10,6 +10,7 @@ import (
 	"os/signal"
 
 	"github.com/blinkspark/prototypes/blinkserver/config"
+	"golang.org/x/net/webdav"
 )
 
 var (
@@ -48,13 +49,40 @@ func main() {
 			}
 			server.Handler = httputil.NewSingleHostReverseProxy(url)
 		}
-		go func() {
-			server.ListenAndServe()
-		}()
+		if len(s.WebDAVs) > 0 {
+			handler := http.ServeMux{}
+			for _, dav := range s.WebDAVs {
+				h := webdav.Handler{
+					FileSystem: webdav.Dir(dav.Root),
+					LockSystem: webdav.NewMemLS(),
+				}
+				handler.HandleFunc(dav.Prefix, func(w http.ResponseWriter, r *http.Request) {
+					log.Printf("%#+v\n", dav)
+					uname, passwd, _ := r.BasicAuth()
+					for _, user := range dav.Users {
+						if user.User == uname && user.Password == passwd {
+							w.Header().Set("Timeout", "99999999")
+							h.ServeHTTP(w, r)
+						}
+					}
+					w.Header().Set("WWW-Authenticate", `Basic realm="BASIC WebDAV REALM"`)
+					w.WriteHeader(401)
+					w.Write([]byte("401 Unauthorized\n"))
+				})
+			}
+			server.Handler = &handler
+		}
+		go func(s config.ServerConfig) {
+			if s.Cert != "" && s.Key != "" {
+				server.ListenAndServeTLS(s.Cert, s.Key)
+			} else {
+				server.ListenAndServe()
+			}
+		}(s)
 	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 	sig := <-sigChan
-	log.Printf("%#+v\n", sig)
+	log.Printf("server stoped, received signal:%#+v\n", sig)
 }
