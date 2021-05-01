@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/NYTimes/gziphandler"
 	"github.com/blinkspark/prototypes/blinkserver/config"
 	"golang.org/x/net/webdav"
 )
@@ -40,6 +41,9 @@ func main() {
 			} else {
 				fileServer = http.FileServer(http.Dir(s.Root))
 			}
+			if s.EnableGzip {
+				fileServer = gziphandler.GzipHandler(fileServer)
+			}
 			server.Handler = fileServer
 		}
 		if s.To != "" {
@@ -47,30 +51,46 @@ func main() {
 			if err != nil {
 				log.Panic(err)
 			}
-			server.Handler = httputil.NewSingleHostReverseProxy(url)
+			var handler http.Handler
+			handler = httputil.NewSingleHostReverseProxy(url)
+			if s.EnableGzip {
+				handler = gziphandler.GzipHandler(handler)
+			}
+			server.Handler = handler
 		}
 		if len(s.WebDAVs) > 0 {
-			handler := http.ServeMux{}
+			davmux := http.ServeMux{}
 			for _, dav := range s.WebDAVs {
 				h := webdav.Handler{
+					Prefix:     dav.Prefix,
 					FileSystem: webdav.Dir(dav.Root),
 					LockSystem: webdav.NewMemLS(),
 				}
-				handler.HandleFunc(dav.Prefix, func(w http.ResponseWriter, r *http.Request) {
-					log.Printf("%#+v\n", dav)
-					uname, passwd, _ := r.BasicAuth()
-					for _, user := range dav.Users {
-						if user.User == uname && user.Password == passwd {
-							w.Header().Set("Timeout", "99999999")
-							h.ServeHTTP(w, r)
+				davmux.HandleFunc(dav.Prefix, func(w http.ResponseWriter, r *http.Request) {
+					if dav.AccessControl {
+						uname, passwd, _ := r.BasicAuth()
+						for _, user := range dav.Users {
+							if user.User == uname && user.Password == passwd {
+								w.Header().Set("Timeout", "99999999")
+								h.ServeHTTP(w, r)
+								return
+							}
 						}
+						w.Header().Set("WWW-Authenticate", `Basic realm="BASIC WebDAV REALM"`)
+						w.WriteHeader(401)
+						w.Write([]byte("401 Unauthorized\n"))
+					} else {
+						w.Header().Set("Timeout", "99999999")
+						h.ServeHTTP(w, r)
 					}
-					w.Header().Set("WWW-Authenticate", `Basic realm="BASIC WebDAV REALM"`)
-					w.WriteHeader(401)
-					w.Write([]byte("401 Unauthorized\n"))
 				})
 			}
-			server.Handler = &handler
+			var handler http.Handler
+			handler = &davmux
+			if s.EnableGzip {
+				handler = gziphandler.GzipHandler(handler)
+			}
+			server.Handler = handler
 		}
 		go func(s config.ServerConfig) {
 			if s.Cert != "" && s.Key != "" {

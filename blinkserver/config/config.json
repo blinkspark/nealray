@@ -2,8 +2,9 @@
   "servers": [
     {
       "addr": ":8080",
-      "root": ".",
-      "disable_listing": true
+      "root": "/var/www/html/",
+      "disable_listing": true,
+      "enable_gzip":true
     },
     {
       "addr": ":8090",
