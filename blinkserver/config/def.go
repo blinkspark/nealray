@@ -16,10 +16,9 @@ type ServerConfig struct {
 }
 
 type DavConfig struct {
-	Root          string    `json:"root,omitempty"`
-	Prefix        string    `json:"prefix,omitempty"`
-	AccessControl bool      `json:"access_control,omitempty"`
-	Users         []DavUser `json:"users,omitempty"`
+	Root   string    `json:"root,omitempty"`
+	Prefix string    `json:"prefix,omitempty"`
+	Users  []DavUser `json:"users,omitempty"`
 }
 
 type DavUser struct {

@@ -34,6 +34,7 @@ func main() {
 		server := http.Server{
 			Addr: s.Addr,
 		}
+		// file server
 		if s.Root != "" {
 			var fileServer http.Handler
 			if s.DisableListing {
@@ -46,6 +47,7 @@ func main() {
 			}
 			server.Handler = fileServer
 		}
+		// reverse proxy
 		if s.To != "" {
 			url, err := url.Parse(s.To)
 			if err != nil {
@@ -58,6 +60,7 @@ func main() {
 			}
 			server.Handler = handler
 		}
+		// webdav
 		if len(s.WebDAVs) > 0 {
 			davmux := http.ServeMux{}
 			for _, dav := range s.WebDAVs {
@@ -67,7 +70,7 @@ func main() {
 					LockSystem: webdav.NewMemLS(),
 				}
 				davmux.HandleFunc(dav.Prefix, func(w http.ResponseWriter, r *http.Request) {
-					if dav.AccessControl {
+					if len(dav.Users) > 0 {
 						uname, passwd, _ := r.BasicAuth()
 						for _, user := range dav.Users {
 							if user.User == uname && user.Password == passwd {

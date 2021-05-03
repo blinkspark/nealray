@@ -3,7 +3,7 @@
     {
       "addr": ":8080",
       "root": "/var/www/html/",
-      "disable_listing": true,
+      "disable_listing": false,
       "enable_gzip":true
     },
     {
