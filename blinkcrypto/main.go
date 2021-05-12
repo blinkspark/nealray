@@ -59,12 +59,12 @@ func main() {
 	}
 
 	if *d {
-		err = c.DecryptFile("main.go.enc", "main.go.dec")
+		err = c.DecryptFile(*iFile, *oFile)
 		if err != nil {
 			log.Panic(err)
 		}
 	} else {
-		err = c.EncryptFile("main.go", "main.go.enc")
+		err = c.EncryptFile(*iFile, *oFile)
 		if err != nil {
 			log.Panic(err)
 		}
