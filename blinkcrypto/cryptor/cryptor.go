@@ -18,7 +18,10 @@ const (
 	CryptorXChacha20poly1305
 )
 
-const DefaultBufferSize = 1 << 20
+const (
+	DefaultBufferSize = 1 << 20
+	AuthMSGLength     = 16
+)
 
 type Cryptor struct {
 	cipher.AEAD `json:"-"`
@@ -77,7 +80,7 @@ func (c *Cryptor) EncryptFile(fname string, outFName string) error {
 }
 
 func (c *Cryptor) DecryptFile(fname string, outFName string) error {
-	buffer := make([]byte, DefaultBufferSize)
+	buffer := make([]byte, DefaultBufferSize+AuthMSGLength)
 
 	f, err := os.Open(fname)
 	if err != nil {
