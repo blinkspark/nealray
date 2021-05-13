@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"os"
 
 	"github.com/blinkspark/prototypes/blinkcrypto/cryptor"
 )
@@ -18,9 +19,13 @@ var (
 )
 
 func init() {
+	home := os.Getenv("HOME")
+	if home == "" {
+		home = os.Getenv("USERPROFILE")
+	}
 	iFile = flag.String("i", "", "-i [input_file]")
 	oFile = flag.String("o", "", "-o [output_file]")
-	cfgFile = flag.String("c", "config.json", "-c [configfile.json]")
+	cfgFile = flag.String("c", home+"/.blinkcrypto.json", "-c [configfile.json]")
 	d = flag.Bool("d", false, "-d #flag for decrypt")
 	i = flag.Bool("init", false, "-init #flag for init a config file")
 	t = flag.Int("t", 0, "-t 0 # 0 for chacha20poly1305, 1 for xchacha20poly1305")
