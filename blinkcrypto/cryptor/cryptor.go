@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path"
 
 	"golang.org/x/crypto/chacha20poly1305"
 )
@@ -36,6 +37,31 @@ func (c *Cryptor) Save(fname string) error {
 		return err
 	}
 	return os.WriteFile(fname, d, 0666)
+}
+
+func (c *Cryptor) EncryptDir(dirName string, outDirName string) error {
+	err := os.MkdirAll(outDirName, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(dirName)
+	if err != nil {
+		return err
+	}
+	for _, ent := range entries {
+		if ent.IsDir() {
+			err = c.EncryptDir(path.Join(dirName, ent.Name()), path.Join(outDirName, ent.Name()))
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		err = c.EncryptFile(path.Join(dirName, ent.Name()), path.Join(outDirName, ent.Name()))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *Cryptor) EncryptFile(fname string, outFName string) error {
@@ -76,6 +102,31 @@ func (c *Cryptor) EncryptFile(fname string, outFName string) error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Cryptor) DecryptDir(dirName string, outDirName string) error {
+	err := os.MkdirAll(outDirName, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(dirName)
+	if err != nil {
+		return err
+	}
+	for _, ent := range entries {
+		if ent.IsDir() {
+			err = c.DecryptDir(path.Join(dirName, ent.Name()), path.Join(outDirName, ent.Name()))
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		err = c.DecryptFile(path.Join(dirName, ent.Name()), path.Join(outDirName, ent.Name()))
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -64,12 +64,28 @@ func main() {
 	}
 
 	if *d {
-		err = c.DecryptFile(*iFile, *oFile)
+		fInfo, err := os.Lstat(*iFile)
+		if err != nil {
+			log.Panic(err)
+		}
+		if fInfo.IsDir() {
+			err = c.DecryptDir(*iFile, *oFile)
+		} else {
+			err = c.DecryptFile(*iFile, *oFile)
+		}
 		if err != nil {
 			log.Panic(err)
 		}
 	} else {
-		err = c.EncryptFile(*iFile, *oFile)
+		fInfo, err := os.Lstat(*iFile)
+		if err != nil {
+			log.Panic(err)
+		}
+		if fInfo.IsDir() {
+			err = c.EncryptDir(*iFile, *oFile)
+		} else {
+			err = c.EncryptFile(*iFile, *oFile)
+		}
 		if err != nil {
 			log.Panic(err)
 		}
