@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strings"
 
 	"golang.org/x/crypto/chacha20poly1305"
 )
@@ -56,7 +57,7 @@ func (c *Cryptor) EncryptDir(dirName string, outDirName string) error {
 			}
 			continue
 		}
-		err = c.EncryptFile(path.Join(dirName, ent.Name()), path.Join(outDirName, ent.Name()))
+		err = c.EncryptFile(path.Join(dirName, ent.Name()), path.Join(outDirName, ent.Name()+".enc"))
 		if err != nil {
 			return err
 		}
@@ -122,7 +123,8 @@ func (c *Cryptor) DecryptDir(dirName string, outDirName string) error {
 			}
 			continue
 		}
-		err = c.DecryptFile(path.Join(dirName, ent.Name()), path.Join(outDirName, ent.Name()))
+		fname := strings.TrimSuffix(ent.Name(), ".enc")
+		err = c.DecryptFile(path.Join(dirName, ent.Name()), path.Join(outDirName, fname))
 		if err != nil {
 			return err
 		}
