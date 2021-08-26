@@ -1,8 +1,11 @@
 package util
 
-import "os"
+import (
+	"errors"
+	"os"
+)
 
-func PathValid(fpath string) bool {
-	_, err := os.Stat(fpath)
-	return err == nil
+func PathExists(fpath string) bool {
+	_, err := os.Lstat(fpath)
+	return !errors.Is(err, os.ErrNotExist)
 }
