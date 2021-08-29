@@ -16,3 +16,4 @@
 
 # etc
 blinkserver/bin/
+*.key
