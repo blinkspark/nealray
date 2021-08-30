@@ -2,14 +2,11 @@ module github.com/blinkspark/prototypes/filestore
 
 go 1.17
 
-require (
-	github.com/blinkspark/prototypes/util v0.0.0-20210826080225-387a71b584ab
-	github.com/libp2p/go-libp2p v0.14.4
-	github.com/libp2p/go-libp2p-core v0.8.5
-)
+require github.com/blinkspark/prototypes/network_core v0.0.0-20210829045043-742e363b2c29
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/blinkspark/prototypes/util v0.0.0-20210826131923-6f4e7b08d5bb // indirect
 	github.com/btcsuite/btcd v0.21.0-beta // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
@@ -34,9 +31,11 @@ require (
 	github.com/libp2p/go-conn-security-multistream v0.2.1 // indirect
 	github.com/libp2p/go-eventbus v0.2.1 // indirect
 	github.com/libp2p/go-flow-metrics v0.0.3 // indirect
+	github.com/libp2p/go-libp2p v0.14.4 // indirect
 	github.com/libp2p/go-libp2p-autonat v0.4.2 // indirect
 	github.com/libp2p/go-libp2p-blankhost v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-circuit v0.4.0 // indirect
+	github.com/libp2p/go-libp2p-core v0.8.5 // indirect
 	github.com/libp2p/go-libp2p-discovery v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-mplex v0.4.1 // indirect
 	github.com/libp2p/go-libp2p-nat v0.0.6 // indirect
