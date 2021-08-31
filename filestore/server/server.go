@@ -13,6 +13,8 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
+	log.Println(fstore.ID())
+	log.Println(fstore.Addrs())
 	log.Printf("%#+v", fstore)
 	select {}
 }
