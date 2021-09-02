@@ -17,3 +17,4 @@
 # etc
 blinkserver/bin/
 *.key
+filestore/data/

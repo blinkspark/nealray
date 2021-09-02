@@ -1,213 +1,77 @@
 package filestore
 
 import (
-	"encoding/binary"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"path"
-	"strings"
+	"path/filepath"
 
-	ncore "github.com/blinkspark/prototypes/network_core"
-	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/gorilla/mux"
 )
 
-const (
-	FILESTORE_PROTOCOL = "nealfree.cf/filestore/v0.1"
-)
+// filestore.go
+// a file store that stores files in a directory
+// and provides restful api to access them
 
-type FSFileStore struct {
-	*ncore.NetworkCore
-	StorePath string
-	KeyPath   string
+// FileStore is a file store that stores files in a directory
+// and provides restful api to access them
+type FileStore struct {
+	Path string
 }
 
-// handleFileStoreStream handles a stream for the filestore protocol
-// first byte is the command
-// 0x00 - get file
-// 0x01 - put file
-// 0x02 - delete file
-// 0x03 - list files
-// the next 4 bytes is filename length or path length
-// if we got error return a message starts with 0xff
-// if no error return a message starts with 0x00
-func (fstore *FSFileStore) handleFileStoreStream(s network.Stream) {
-	log.Println("handleFileStoreStream")
-	defer s.Reset()
-	buf := make([]byte, 1)
-	_, err := s.Read(buf)
+// NewFileStore creates a new file store
+func NewFileStore(path string) (*FileStore, error) {
+	if path == "" {
+		log.Panic("path is reqired")
+	}
+	err := os.MkdirAll(path, 0755)
 	if err != nil {
-		return
+		return nil, err
 	}
-	switch buf[0] {
-	case 0x00:
-		fstore.handleGetFile(s)
-	case 0x01:
-		fstore.handlePutFile(s)
-	case 0x02:
-		fstore.handleDeleteFile(s)
-	case 0x03:
-		fstore.handleListFiles(s)
-	default:
-		s.Write([]byte{0xff})
-	}
+	return &FileStore{path}, nil
 }
 
-// handleGetFile handles a get file request
-func (fstore *FSFileStore) handleGetFile(s network.Stream) {
-	// TODO fix this
-	buf := make([]byte, 4)
-	_, err := s.Read(buf)
-	if err != nil {
-		return
-	}
-	filename := string(buf)
-	file, err := fstore.GetFile(filename)
-	if err != nil {
-		s.Write([]byte{0xff})
-		return
-	}
-	defer file.Close()
-
-	s.Write([]byte{0x00})
-	// make a buffer to read the file
-	buf = make([]byte, 1024)
-	for {
-		n, err := file.Read(buf)
-		if err != nil {
-			break
-		}
-		s.Write(buf[:n])
-	}
+// ListenAndServe starts the file store server
+func (fs *FileStore) Router() *mux.Router {
+	r := mux.NewRouter()
+	log.Println("register router")
+	r.PathPrefix("/").Methods("GET").HandlerFunc(fs.GetFile)
+	r.PathPrefix("/").Methods("PUT", "POST").HandlerFunc(fs.PutFile)
+	return r
 }
 
-// handlePutFile handles a put file request
-func (fstore *FSFileStore) handlePutFile(s network.Stream) {
-	log.Println("handlePutFile")
-	// make a buffer to read stream
-	buf := make([]byte, 1024)
-	// read first 4 bytes for filename length
-	_, err := s.Read(buf[:4])
+// GetFile returns the file
+func (fs *FileStore) GetFile(w http.ResponseWriter, r *http.Request) {
+	log.Println("GetFile")
+	path := path.Join(fs.Path, r.URL.Path)
+	_, fname := filepath.Split(path)
+	f, err := os.Open(path)
 	if err != nil {
-		s.Write([]byte{0xff})
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	filenameLength := binary.BigEndian.Uint32(buf[:4])
-	// read filename
-	_, err = s.Read(buf[:filenameLength])
-	if err != nil {
-		s.Write([]byte{0xff})
-		return
-	}
-	filename := string(buf[:filenameLength])
-	// write file
-	fstore.PutFile(filename, s)
+	defer f.Close()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", "attachment; filename="+fname)
+	io.Copy(w, f)
+	// w.Write([]byte(path))
 }
 
-// PutFile puts a file to the store
-func (fstore *FSFileStore) PutFile(filename string, s io.ReadWriter) {
+// PutFile puts the file
+func (fs *FileStore) PutFile(w http.ResponseWriter, r *http.Request) {
 	log.Println("PutFile")
-	fpath := path.Join(fstore.StorePath, filename)
-	file, err := os.Create(fpath)
+	path := path.Join(fs.Path, r.URL.Path)
+	// _, fname := filepath.Split(path)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0755)
 	if err != nil {
-		s.Write([]byte{0xff})
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	defer file.Close()
-
-	// make a buffer to read stream
-	buf := make([]byte, 1024)
-	for {
-		n, err := s.Read(buf)
-		if err != nil {
-			break
-		}
-		file.Write(buf[:n])
-	}
-}
-
-// GetFile gets a file from the store
-func (fstore *FSFileStore) GetFile(filename string) (io.ReadCloser, error) {
-	fpath := path.Join(fstore.StorePath, filename)
-	return os.Open(fpath)
-}
-
-// handleListFiles handles a list files request
-func (fstore *FSFileStore) handleListFiles(s network.Stream) {
-	// read first 4 bytes for path name length
-	buf := make([]byte, 4)
-	_, err := s.Read(buf)
-	if err != nil {
-		return
-	}
-	pathname := string(buf)
-	// invoke list files
-	filenames, err := fstore.ListFiles(pathname)
-	if err != nil {
-		s.Write([]byte{0xff})
-		return
-	}
-	// write 0x00
-	s.Write([]byte{0x00})
-	// write file names divided by ,
-	s.Write([]byte(strings.Join(filenames, ",")))
-}
-
-// ListFiles lists files in store given path
-func (fstore *FSFileStore) ListFiles(pathname string) ([]string, error) {
-	fpath := path.Join(fstore.StorePath, pathname)
-	files, err := os.ReadDir(fpath)
-	if err != nil {
-		return nil, err
-	}
-	var filenames []string
-	for _, file := range files {
-		filenames = append(filenames, file.Name())
-	}
-	return filenames, nil
-}
-
-// handleDeleteFile handles a delete file request
-func (fstore *FSFileStore) handleDeleteFile(s network.Stream) {
-	buf := make([]byte, 4)
-	_, err := s.Read(buf)
-	if err != nil {
-		return
-	}
-	filename := string(buf)
-	err = fstore.DeleteFile(filename)
-	if err != nil {
-		s.Write([]byte{0xff})
-		return
-	}
-	s.Write([]byte{0x00})
-}
-
-// DeleteFile deletes a file from the store
-func (fstore *FSFileStore) DeleteFile(filename string) error {
-	fpath := path.Join(fstore.StorePath, filename)
-	return os.Remove(fpath)
-}
-
-// NewFSFileStore creates a new FSFileStore
-func NewFSFileStore(storePath, keyPath string, listenAddrs []string) (*FSFileStore, error) {
-	log.Println("NewFSFileStore")
-	networkCore, err := ncore.NewNetworkCore(keyPath, listenAddrs)
-	if err != nil {
-		return nil, err
-	}
-
-	err = os.MkdirAll(storePath, 0755)
-	if err != nil {
-		return nil, err
-	}
-
-	fstore := &FSFileStore{
-		NetworkCore: networkCore,
-		StorePath:   storePath,
-		KeyPath:     keyPath,
-	}
-	log.Println("SetStreamHandler")
-	networkCore.SetStreamHandler(FILESTORE_PROTOCOL, fstore.handleFileStoreStream)
-	return fstore, nil
+	defer f.Close()
+	io.Copy(f, r.Body)
+	w.WriteHeader(http.StatusOK)
 }

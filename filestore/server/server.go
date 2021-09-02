@@ -2,19 +2,17 @@ package main
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/blinkspark/prototypes/filestore"
 )
 
-// this is the server of file store
-
 func main() {
-	fstore, err := filestore.NewFSFileStore("data", "id.key", []string{"/ip4/0.0.0.0/tcp/33445"})
+	fstore, err := filestore.NewFileStore("data")
 	if err != nil {
 		log.Panic(err)
 	}
-	log.Println(fstore.ID())
-	log.Println(fstore.Addrs())
-	log.Printf("%#+v", fstore)
-	select {}
+
+	r := fstore.Router()
+	http.ListenAndServe(":8888", r)
 }
