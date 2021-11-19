@@ -2,18 +2,23 @@ use std::{fs::File, io::Read, io::Write};
 
 use chacha20::{
     cipher::{NewCipher, StreamCipher},
-    Key, XChaCha20, XNonce,
+    Key, Nonce, XChaCha20, XNonce,
 };
 const BUFF_SIZE: usize = 4096;
 const XNONCE_SIZE: usize = 24;
 
-pub trait FileCrypt<K, N> {
+pub trait FileCryptChacha20<K, N> {
     fn encrypt(&mut self, key: &K, nonce: &N, output: &File) -> Result<(), std::io::Error>;
     fn decrypt(&mut self, key: &K, output: &File) -> Result<(), std::io::Error>;
 }
 
-impl FileCrypt<Key, XNonce> for File {
-    fn encrypt(&mut self, key: &Key, nonce: &XNonce, mut output: &File) -> Result<(), std::io::Error> {
+impl FileCryptChacha20<Key, XNonce> for File {
+    fn encrypt(
+        &mut self,
+        key: &Key,
+        nonce: &XNonce,
+        mut output: &File,
+    ) -> Result<(), std::io::Error> {
         let mut xchacha = XChaCha20::new(key, nonce);
         let mut buffer = [0u8; BUFF_SIZE];
         output.write_all(nonce.as_slice())?;

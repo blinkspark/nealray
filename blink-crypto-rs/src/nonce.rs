@@ -1,10 +1,10 @@
 use chacha20::XNonce;
 
-pub trait Gen {
+pub trait GenNonce {
     fn gen() -> Result<Box<Self>, std::io::Error>;
 }
 
-impl Gen for XNonce {
+impl GenNonce for XNonce {
     fn gen() -> Result<Box<XNonce> , std::io::Error> {
       let mut ret = XNonce::default();
       getrandom::getrandom(ret.as_mut_slice())?;
