@@ -2,7 +2,7 @@ use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{aead::NewAead, ChaCha20Poly1305, Key, Nonce, XChaCha20Poly1305, XNonce};
 use getrandom::getrandom;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufWriter, Read, Write};
 
 pub const KEY_SIZE: usize = 32;
 pub const NONCE_SIZE: usize = 12;
