@@ -7,12 +7,12 @@ use chacha20::{
 const BUFF_SIZE: usize = 4096;
 const XNONCE_SIZE: usize = 24;
 
-pub trait FileCryptChacha20<K, N> {
+pub trait FileCryptXChacha20<K, N> {
     fn encrypt(&mut self, key: &K, nonce: &N, output: &File) -> Result<(), std::io::Error>;
     fn decrypt(&mut self, key: &K, output: &File) -> Result<(), std::io::Error>;
 }
 
-impl FileCryptChacha20<Key, XNonce> for File {
+impl FileCryptXChacha20<Key, XNonce> for File {
     fn encrypt(
         &mut self,
         key: &Key,
