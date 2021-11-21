@@ -2,7 +2,7 @@ use std::{fs::File, io::Read, io::Write};
 
 use chacha20::{
     cipher::{NewCipher, StreamCipher},
-    Key, Nonce, XChaCha20, XNonce,
+    Key, XChaCha20, XNonce,
 };
 const BUFF_SIZE: usize = 4096;
 const XNONCE_SIZE: usize = 24;
