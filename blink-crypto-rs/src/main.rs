@@ -2,6 +2,10 @@
 // #![allow(unused_imports)]
 
 mod nonce;
+use blake2::{
+    digest::{Update, VariableOutput},
+    VarBlake2b,
+};
 use chacha20::{Key, XNonce};
 use nonce::GenNonce;
 
@@ -16,6 +20,10 @@ use std::{
 
 mod stream;
 use stream::FileCryptXChacha20;
+
+const BUFF_SIZE: usize = 4096;
+const OUTPUT_PLACE_HOLDER: &str = "tmp.enc";
+
 fn main() {
     let app = App::new("blink file crypto")
         .version("0.1.0")
@@ -57,6 +65,13 @@ fn main() {
                         .about("-g #flag represent to generate a new key")
                         .short('g')
                         .long("gen"),
+                )
+                .arg(
+                    Arg::new("dir")
+                        .about("-d DIR")
+                        .short('d')
+                        .long("dir")
+                        .takes_value(true),
                 ),
         )
         .subcommand(
@@ -96,8 +111,9 @@ fn main() {
 
     if let Some(enc_cmd) = app.subcommand_matches("encrypt") {
         let input = enc_cmd.value_of("input").expect("need a input file");
-        let output = enc_cmd.value_of("output").expect("need a output file");
+        let mut output = enc_cmd.value_of("output").unwrap_or("");
         let gen = enc_cmd.is_present("gen");
+        let dir = enc_cmd.value_of("dir").unwrap_or("");
         let key = if let Some(password) = enc_cmd.value_of("password") {
             Key::new_from_password(password).expect("can not generate key from password!")
         } else if let Some(key_path) = enc_cmd.value_of("key") {
@@ -121,13 +137,42 @@ fn main() {
             panic!("need a password or key file!")
         };
 
-        let mut input = File::open(input).expect("can not open input file");
-        let mut output = File::create(output).expect("can not create output file");
-        let nonce = XNonce::gen().expect("can not generate nonce");
+        let need_rename = true;
+        if output == "" {
+            output = OUTPUT_PLACE_HOLDER;
+        }
 
-        input
-            .encrypt(&key, &nonce, &mut output)
-            .expect("can not encrypt file");
+        // need to close files here
+        {
+            let mut input = File::open(input).expect("can not open input file");
+            let mut output = File::create(output).expect("can not create output file");
+            let nonce = XNonce::gen().expect("can not generate nonce");
+
+            input
+                .encrypt(&key, &nonce, &mut output)
+                .expect("can not encrypt file");
+        }
+
+        if need_rename {
+            // rename output file to its hash
+            let mut hasher = VarBlake2b::new(32).expect("can not create hasher");
+            let mut output = File::open(OUTPUT_PLACE_HOLDER).expect("can not open output file");
+            let mut buffer = [0u8; BUFF_SIZE];
+            while let Ok(read) = output.read(buffer.as_mut()) {
+                if read == 0 {
+                    break;
+                }
+                hasher.update(&buffer[..read]);
+            }
+            let mut hash = Vec::new();
+            hasher.finalize_variable(|res| {
+                hash = res.to_vec();
+            });
+            let hash = hex::encode(hash);
+            let path = std::path::PathBuf::new().join(dir).join(hash + ".enc");
+            std::fs::rename(OUTPUT_PLACE_HOLDER, path.to_str().unwrap())
+                .expect("can not rename output file");
+        }
     }
     if let Some(dec_cmd) = app.subcommand_matches("decrypt") {
         let input = dec_cmd.value_of("input").expect("need a input file");

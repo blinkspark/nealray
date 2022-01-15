@@ -1,2 +1,2 @@
 #!/bin/bash
-go build -o ./bin/a.exe && ./bin/a.exe
+go build -o ./build/main.exe && build/main.exe
