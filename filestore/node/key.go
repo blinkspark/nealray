@@ -1,4 +1,4 @@
-package main
+package node
 
 import (
 	"crypto/rand"
@@ -28,8 +28,8 @@ func loadKeyFromFile(path string) (crypto.PrivKey, error) {
 	return crypto.UnmarshalPrivateKey(data)
 }
 
-// getEd25519KeyFromFile get key from file or generate new one and save it to file
-func getEd25519KeyFromFile(path string) (crypto.PrivKey, error) {
+// ed25519KeyFromFile get key from file or generate new one and save it to file
+func ed25519KeyFromFile(path string) (crypto.PrivKey, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		key, err := generateEd25519Key()
 		if err != nil {
