@@ -25,7 +25,7 @@ type Node struct {
 	BootstrapDoneChan chan bool
 }
 
-func New(keyPath string) (node *Node, err error) {
+func New(keyPath string, port int) (node *Node, err error) {
 	var h host.Host
 	var dhtNode *dht.IpfsDHT
 	var pubsubNode *pubsub.PubSub
@@ -35,7 +35,7 @@ func New(keyPath string) (node *Node, err error) {
 		return nil, err
 	}
 
-	h, err = libp2p.New(libp2p.Identity(priv), libp2p.ListenAddrStrings(listenAddrs(22233)...), libp2p.EnableAutoRelay(), libp2p.EnableHolePunching(), libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+	h, err = libp2p.New(libp2p.Identity(priv), libp2p.ListenAddrStrings(listenAddrs(port)...), libp2p.EnableAutoRelay(), libp2p.EnableHolePunching(), libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 		dhtNode, err = dht.New(context.Background(), h)
 		if err != nil {
 			return nil, err
@@ -81,9 +81,9 @@ func (n *Node) Bootstrap() error {
 			defer wg.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			log.Println("Bootstrapping DHT with", pi)
+			// log.Println("Bootstrapping DHT with", pi)
 			err = n.Host.Connect(ctx, pi)
-			log.Println(err)
+			// log.Println(err)
 		}(pi)
 	}
 	go func() {
