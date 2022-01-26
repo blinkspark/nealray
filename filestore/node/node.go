@@ -5,7 +5,6 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -18,14 +17,15 @@ import (
 )
 
 type Node struct {
-	Host              host.Host
-	DHT               *dht.IpfsDHT
-	Pubsub            *pubsub.PubSub
-	Discovery         *discovery.RoutingDiscovery
-	BootstrapDoneChan chan bool
+	Host      host.Host
+	DHT       *dht.IpfsDHT
+	Pubsub    *pubsub.PubSub
+	Discovery *discovery.RoutingDiscovery
+	Protocol  string
+	Logger    *log.Logger
 }
 
-func New(keyPath string, port int) (node *Node, err error) {
+func New(keyPath string, port int, protocol string, logger *log.Logger) (node *Node, err error) {
 	var h host.Host
 	var dhtNode *dht.IpfsDHT
 	var pubsubNode *pubsub.PubSub
@@ -44,7 +44,7 @@ func New(keyPath string, port int) (node *Node, err error) {
 		if err != nil {
 			return nil, err
 		}
-		log.Println("Bootstrapped DHT")
+		logger.Println("Bootstrapped DHT")
 		return dhtNode, nil
 	}))
 	if err != nil {
@@ -58,39 +58,87 @@ func New(keyPath string, port int) (node *Node, err error) {
 
 	disc := discovery.NewRoutingDiscovery(dhtNode)
 
-	log.Println("Created libp2p host")
+	logger.Println("Created libp2p host")
 	return &Node{
-		Host:              h,
-		DHT:               dhtNode,
-		Pubsub:            pubsubNode,
-		Discovery:         disc,
-		BootstrapDoneChan: make(chan bool),
+		Host:      h,
+		DHT:       dhtNode,
+		Pubsub:    pubsubNode,
+		Discovery: disc,
+		Protocol:  protocol,
+		Logger:    logger,
 	}, nil
 }
 
-func (n *Node) Bootstrap() error {
+func (n *Node) bootstrap() {
 	pis, err := peer.AddrInfosFromP2pAddrs(dht.DefaultBootstrapPeers...)
 	if err != nil {
-		return err
+		n.Logger.Panic(err)
 	}
 
-	wg := sync.WaitGroup{}
 	for _, pi := range pis {
-		wg.Add(1)
 		go func(pi peer.AddrInfo) {
-			defer wg.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			// log.Println("Bootstrapping DHT with", pi)
-			err = n.Host.Connect(ctx, pi)
-			// log.Println(err)
+			// n.Logger.Println("Bootstrapping DHT with", pi)
+			n.Host.Connect(ctx, pi)
+			// n.Logger.Println(err)
 		}(pi)
 	}
-	go func() {
-		wg.Wait()
-		n.BootstrapDoneChan <- true
-	}()
-	return nil
+}
+
+func (n *Node) Start() chan bool {
+	done := make(chan bool, 1)
+	go n.bootstrap()
+	go n.advertise()
+	go n.discover()
+	return done
+}
+
+func (n *Node) advertise() {
+	var err error
+	var ttl time.Duration
+	for {
+		ttl, err = n.Discovery.Advertise(context.Background(), n.Protocol)
+		if err != nil {
+			n.Logger.Println(err)
+			time.Sleep(time.Second)
+			n.Logger.Println("Retrying to advertise")
+			continue
+		}
+		n.Logger.Println("Advertising... ttl:", ttl)
+		time.Sleep(ttl)
+	}
+}
+
+func (n *Node) discover() {
+	var peerChan <-chan peer.AddrInfo
+	var err error
+	for {
+		peerChan, err = n.Discovery.FindPeers(context.Background(), n.Protocol)
+		if err != nil {
+			n.Logger.Println(err)
+			time.Sleep(time.Second)
+			n.Logger.Println("Retrying to find peers")
+			continue
+		}
+		for pi := range peerChan {
+			if pi.ID == n.Host.ID() {
+				n.Logger.Println("Skipping self")
+				continue
+			}
+			go func(pi peer.AddrInfo) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				n.Logger.Println("Connecting to", pi)
+				err = n.Host.Connect(ctx, pi)
+				if err != nil {
+					n.Logger.Println("Connection failed:", err)
+				}
+			}(pi)
+		}
+		time.Sleep(time.Second)
+		n.Logger.Println("Finished discovering, restarting another round")
+	}
 }
 
 func listenAddrs(port int) []string {
