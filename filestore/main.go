@@ -34,22 +34,9 @@ func init() {
 }
 
 func main() {
-	timeStr := time.Now().Format("20060102150405")
-	// log.New()
-	logger := log.Default()
-	if !args.Verbose {
-		_, err := os.Stat(args.LogPath)
-		if err == nil {
-			err = os.MkdirAll(args.LogPath, 0755)
-			if err != nil {
-				log.Panic(err)
-			}
-		}
-		f, err := os.Create(path.Join(args.LogPath, timeStr+".log"))
-		if err != nil {
-			log.Panic(err)
-		}
-		logger = log.New(f, "", log.LstdFlags)
+	logger, err := newLogger()
+	if err != nil {
+		log.Panic(err)
 	}
 
 	p2pNode, err := node.New(args.KeyPath, args.Port, FILE_PROTOCOL, logger)
@@ -59,4 +46,24 @@ func main() {
 	logger.Println(p2pNode.Host.ID(), p2pNode.Host.Addrs())
 
 	<-p2pNode.Start()
+}
+
+func newLogger() (*log.Logger, error) {
+	timeStr := time.Now().Format("20060102150405")
+	logger := log.Default()
+	if !args.Verbose {
+		_, err := os.Stat(args.LogPath)
+		if err == nil {
+			err = os.MkdirAll(args.LogPath, 0755)
+			if err != nil {
+				return nil, err
+			}
+		}
+		f, err := os.Create(path.Join(args.LogPath, timeStr+".log"))
+		if err != nil {
+			return nil, err
+		}
+		logger = log.New(f, "", log.LstdFlags)
+	}
+	return logger, nil
 }
