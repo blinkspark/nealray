@@ -1,3 +1,4 @@
+import shutil
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -136,8 +137,8 @@ class App(tk.Tk):
         self.bind('<Right>', lambda e: self.next_action())
         self.bind('<Left>', lambda e: self.prev_action())
         self.bind(
-            '<Home>',
-            lambda e: self.imgGenerator.set_index(0) and self.update_all())
+            '<Home>', lambda e:
+            (self.imgGenerator.set_index(0), self.update_all()))
         self.bind('<Escape>', lambda e: self.quit())
 
         self.bind('1', lambda e: self.set_score(1))
@@ -186,6 +187,7 @@ class App(tk.Tk):
         fileMenu.add_command(label='Save', command=root.save_csv_action)
         fileMenu.add_separator()
         fileMenu.add_command(label='Dedupe', command=root.dedupe_action)
+        fileMenu.add_command(label='Merge...', command=root.merge_action)
         fileMenu.add_separator()
         fileMenu.add_command(label='Exit', command=lambda: root.quit())
         mainMenu.add_cascade(label='File', menu=fileMenu)
@@ -248,7 +250,8 @@ class App(tk.Tk):
         self.update_score()
 
     def file_open_action(self):
-        newDir = filedialog.askdirectory(initialdir='.', mustexist=True)
+        newDir = filedialog.askdirectory(initialdir=self.workingDir,
+                                         mustexist=True)
         if newDir == '':
             return
         self.workingDir = newDir
@@ -298,6 +301,26 @@ class App(tk.Tk):
 
     def save_csv_action(self):
         self.dataFrame.to_csv(self.dataCsvPath, index_label='id')
+
+    def merge_action(self):
+        newDir = filedialog.askdirectory(initialdir=self.workingDir, mustexist=True)
+        if newDir == '':
+            return
+        newDataFrame = pd.read_csv(path.join(newDir, 'data.csv'), index_col='id')
+        self.dataFrame = pd.concat([self.dataFrame, newDataFrame], ignore_index=True)
+        self.dedupe_data()
+        self.save_csv_action()
+        
+        imgGen = ImageGenerator(newDir)
+        for imgName in imgGen.imgNameList:
+            imgPath = path.join(newDir, imgName)
+            imgTargetPath = path.join(self.workingDir, imgName)
+            if not path.exists(imgTargetPath):
+                shutil.copy(imgPath, imgTargetPath)
+
+        self.imgGenerator.set_working_dir(self.workingDir)
+        self.imgGenerator.set_index(0)
+        self.update_all()
 
 
 app = App()
