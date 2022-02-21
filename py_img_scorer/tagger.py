@@ -83,6 +83,9 @@ class ImageGenerator:
         self.prevImg = self.img_tk(self.prev_index(self.index))
         return self.currentImg
 
+    def get_img_name(self):
+        return self.imgNameList[self.index]
+
     def set_index(self, index):
         self.index = index
         self.init_img()
@@ -105,14 +108,36 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Image Scorer")
+        ttk.Style().configure('My.TCheckbutton', font=(18))
+
+        self.tagNames = {
+            'R18': tk.StringVar(value='0'),
+            '2D': tk.StringVar(value='0'),
+            '3D': tk.StringVar(value='0'),
+            # '现实': tk.StringVar(value='0'),
+            '差': tk.StringVar(value='0'),
+            '中': tk.StringVar(value='0'),
+            '好': tk.StringVar(value='0'),
+            'BDSM': tk.StringVar(value='0'),
+            'Latex/Rubber': tk.StringVar(value='0'),
+            'Messy': tk.StringVar(value='0'),
+            'Furry': tk.StringVar(value='0'),
+            '兽耳': tk.StringVar(value='0'),
+            '变装': tk.StringVar(value='0'),
+            '裸露': tk.StringVar(value='0'),
+            '性器官': tk.StringVar(value='0'),
+            '性交': tk.StringVar(value='0'),
+            '性玩具': tk.StringVar(value='0'),
+            '触手': tk.StringVar(value='0'),
+            '暴露': tk.StringVar(value='0'),
+            'ABDL': tk.StringVar(value='0'),
+        }
 
         self.workingDir = sys.argv[1] if (
             len(sys.argv) > 1 and os.path.exists(sys.argv[1])) else '.'
 
         self.dataCsvPath = path.join(self.workingDir, 'data.csv')
-        self.dataFrame = pd.read_csv(
-            self.dataCsvPath, index_col='id') if path.exists(
-                self.dataCsvPath) else pd.DataFrame(columns=['img', 'score'])
+        self.dataFrame = self.load_data()
 
         self.imgGenerator = ImageGenerator(self.workingDir)
         self.currImg = self.imgGenerator.get_img()
@@ -127,9 +152,11 @@ class App(tk.Tk):
         self.infoFrame = self.info_frame(self.mainFrame)
         self.indexLabel = self.index_label(self.infoFrame)
         self.pathLabel = self.path_label(self.infoFrame)
-        self.scoreLabel = self.score_label(self.infoFrame)
+        self.tagFrame = self.tag_frame(self.mainFrame)
+        self.tagCheckBoxes = self.tag_checkboxes(self.tagFrame)
+        self.tagBtn = self.tag_btn(self.tagFrame, self.tag_action)
 
-        self.next_unscored()
+        self.next_untaged()
         # self.update_all()
 
         self.bind('<Right>', lambda e: self.next_action())
@@ -139,11 +166,6 @@ class App(tk.Tk):
             (self.imgGenerator.set_index(0), self.update_all()))
         self.bind('<Escape>', lambda e: self.quit())
 
-        self.bind('1', lambda e: self.set_score(1))
-        self.bind('2', lambda e: self.set_score(2))
-        self.bind('3', lambda e: self.set_score(3))
-        self.bind('4', lambda e: self.set_score(4))
-        self.bind('5', lambda e: self.set_score(5))
         self.bind('s', lambda e: self.save_csv_action())
 
     @staticmethod
@@ -186,6 +208,7 @@ class App(tk.Tk):
         fileMenu.add_separator()
         fileMenu.add_command(label='Dedupe', command=root.dedupe_action)
         fileMenu.add_command(label='Merge...', command=root.merge_action)
+        fileMenu.add_command(label='Reset', command=root.reset_action)
         fileMenu.add_separator()
         fileMenu.add_command(label='Exit', command=lambda: root.quit())
         mainMenu.add_cascade(label='File', menu=fileMenu)
@@ -213,10 +236,45 @@ class App(tk.Tk):
         return pathLabel
 
     @staticmethod
-    def score_label(parent):
-        scoreLabel = ttk.Label(parent, text='0', padding=(5, 0))
-        scoreLabel.pack(side=tk.LEFT)
-        return scoreLabel
+    def tag_frame(parent):
+        tagFrame = ttk.Frame(parent)
+        tagFrame.grid(row=3, column=0, columnspan=3)
+        return tagFrame
+
+    @staticmethod
+    def tag_btn(parent, cmd):
+        tagBtn = ttk.Button(parent, text='Tag', command=cmd)
+        tagBtn.pack(side=tk.BOTTOM)
+        return tagBtn
+
+    def tag_checkboxes(self, parent):
+        tagCheckBoxes = []
+        for tagName in self.tagNames:
+            # font size 20
+            tagCheckbox = ttk.Checkbutton(parent,
+                                          padding=(5, 5),
+                                          text=tagName,
+                                          style='My.TCheckbutton',
+                                          variable=self.tagNames[tagName])
+            tagCheckbox.pack(side=tk.LEFT)
+            tagCheckBoxes.append(tagCheckbox)
+        return tagCheckBoxes
+
+    def load_data(self):
+        data = pd.read_csv(self.dataCsvPath, index_col='id') if path.exists(
+            self.dataCsvPath) else pd.DataFrame(
+                columns=['img'].extend(list(self.tagNames)))
+        if len(data.columns) > 0:
+            for tagName in self.tagNames:
+                if not tagName in data.columns:
+                    data[tagName] = pd.Series([], dtype=pd.Int64Dtype)
+                    data[tagName].fillna(0, inplace=True)
+        for c in data.columns:
+            print(data[c].dtype)
+        return data
+
+    def update_data_from_file(self):
+        self.dataFrame = self.load_data()
 
     def update_img(self):
         self.currImg = self.imgGenerator.get_img()
@@ -234,18 +292,21 @@ class App(tk.Tk):
             self.workingDir, self.imgGenerator.imgNameList[
                 self.imgGenerator.index]))
 
-    def update_score(self):
-        score = self.dataFrame.loc[self.dataFrame['img'] ==
-                                   self.imgGenerator.imgNameList[
-                                       self.imgGenerator.index]]['score']
-        self.scoreLabel.configure(
-            text=score.values[0] if score.size > 0 else 0)
+    def update_tags(self):
+        imgName = self.imgGenerator.get_img_name()
+        if self.dataFrame.eq(imgName).any().any():
+            data = self.dataFrame.loc[self.dataFrame.eq(imgName).any(axis=1)]
+            for tagName in self.tagNames:
+                self.tagNames[tagName].set(data[tagName].values[0])
+        else:
+            for tagName in self.tagNames:
+                self.tagNames[tagName].set('0')
 
     def update_all(self):
         self.update_img()
         self.update_index()
         self.update_path()
-        self.update_score()
+        self.update_tags()
 
     def file_open_action(self):
         newDir = filedialog.askdirectory(initialdir=self.workingDir,
@@ -253,10 +314,11 @@ class App(tk.Tk):
         if newDir == '':
             return
         self.workingDir = newDir
+        self.dataCsvPath = path.join(self.workingDir, 'data.csv')
         self.imgGenerator.set_working_dir(self.workingDir)
         self.currImg = self.imgGenerator.get_img()
-        self.next_unscored()
-        # self.update_all()
+        self.imgGenerator.set_index(0)
+        self.update_all()
 
     def next_action(self):
         self.currImg = self.imgGenerator.next()
@@ -268,29 +330,6 @@ class App(tk.Tk):
 
     def dedupe_action(self):
         self.imgGenerator.dedupe()
-        self.update_all()
-
-    def set_score(self, score):
-        scoreData = pd.DataFrame(
-            {
-                'img': self.imgGenerator.imgNameList[self.imgGenerator.index],
-                'score': score
-            },
-            index=[self.imgGenerator.index])
-        self.dataFrame = pd.concat([self.dataFrame, scoreData],
-                                   ignore_index=True)
-        self.dedupe_data()
-        self.imgGenerator.next()
-        self.update_all()
-
-    def next_unscored(self):
-        for (i, img) in enumerate(self.imgGenerator.imgNameList):
-            self.dataFrame['img'].isin([img]).any()
-            if img not in self.dataFrame['img'].values:
-                self.imgGenerator.set_index(i)
-                self.currImg = self.imgGenerator.get_img()
-                self.update_all()
-                break
         self.update_all()
 
     def dedupe_data(self):
@@ -322,6 +361,39 @@ class App(tk.Tk):
         self.imgGenerator.set_working_dir(self.workingDir)
         self.imgGenerator.set_index(0)
         self.update_all()
+
+    def reset_action(self):
+        os.remove(self.dataCsvPath)
+        self.update_data_from_file()
+        self.imgGenerator.set_working_dir(self.workingDir)
+        self.imgGenerator.set_index(0)
+        self.update_all()
+
+    def tag_action(self):
+        tagDict = {
+            'img': self.imgGenerator.imgNameList[self.imgGenerator.index]
+        }
+        for tagName in self.tagNames:
+            tagDict[tagName] = int(self.tagNames[tagName].get())
+        self.dataFrame = pd.concat([
+            self.dataFrame,
+            pd.DataFrame(tagDict, index=[self.imgGenerator.index])
+        ],
+                                   ignore_index=True)
+        self.dedupe_data()
+        self.next_untaged()
+
+    def next_untaged(self):
+        for i, imgName in enumerate(self.imgGenerator.imgNameList):
+            try:
+                if not self.dataFrame['img'].eq(imgName).any():
+                    self.imgGenerator.set_index(i)
+                    self.update_all()
+                    return
+            except Exception as e:
+                # self.imgGenerator.next()
+                self.update_all()
+                return
 
 
 app = App()
