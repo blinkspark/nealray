@@ -269,8 +269,6 @@ class App(tk.Tk):
                 if not tagName in data.columns:
                     data[tagName] = pd.Series([], dtype=pd.Int64Dtype)
                     data[tagName].fillna(0, inplace=True)
-        for c in data.columns:
-            print(data[c].dtype)
         return data
 
     def update_data_from_file(self):
