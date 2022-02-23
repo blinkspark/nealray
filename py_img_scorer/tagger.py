@@ -4,6 +4,8 @@ from tkinter import ttk, filedialog
 from PIL import Image, ImageTk
 from os import path
 import pandas as pd
+import configparser as cp
+import numpy as np
 
 
 ####################### ImageGenerator #############################
@@ -108,30 +110,11 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Image Scorer")
-        ttk.Style().configure('My.TCheckbutton', font=(18))
-
-        self.tagNames = {
-            'R18': tk.StringVar(value='0'),
-            '2D': tk.StringVar(value='0'),
-            '3D': tk.StringVar(value='0'),
-            # '现实': tk.StringVar(value='0'),
-            '差': tk.StringVar(value='0'),
-            '中': tk.StringVar(value='0'),
-            '好': tk.StringVar(value='0'),
-            'BDSM': tk.StringVar(value='0'),
-            'Latex/Rubber': tk.StringVar(value='0'),
-            'Messy': tk.StringVar(value='0'),
-            'Furry': tk.StringVar(value='0'),
-            '兽耳': tk.StringVar(value='0'),
-            '变装': tk.StringVar(value='0'),
-            '裸露': tk.StringVar(value='0'),
-            '性器官': tk.StringVar(value='0'),
-            '性交': tk.StringVar(value='0'),
-            '性玩具': tk.StringVar(value='0'),
-            '触手': tk.StringVar(value='0'),
-            '暴露': tk.StringVar(value='0'),
-            'ABDL': tk.StringVar(value='0'),
-        }
+        ttk.Style().configure('TCheckbutton', font=(20))
+        self.lastTagRow = -1
+        self.lastTagCol = -1
+        self.cfg = cp.ConfigParser()
+        self.cfg.read('config.ini')
 
         self.workingDir = sys.argv[1] if (
             len(sys.argv) > 1 and os.path.exists(sys.argv[1])) else '.'
@@ -241,34 +224,33 @@ class App(tk.Tk):
         tagFrame.grid(row=3, column=0, columnspan=3)
         return tagFrame
 
-    @staticmethod
-    def tag_btn(parent, cmd):
+    def tag_btn(self, parent, cmd):
         tagBtn = ttk.Button(parent, text='Tag', command=cmd)
-        tagBtn.pack(side=tk.BOTTOM)
+        row = self.lastTagRow + 1
+        col = 0
+        colSpan = self.lastTagCol + 1
+        tagBtn.grid(row=row, column=col, columnspan=colSpan)
         return tagBtn
 
     def tag_checkboxes(self, parent):
         tagCheckBoxes = []
-        for tagName in self.tagNames:
-            # font size 20
-            tagCheckbox = ttk.Checkbutton(parent,
-                                          padding=(5, 5),
-                                          text=tagName,
-                                          style='My.TCheckbutton',
-                                          variable=self.tagNames[tagName])
-            tagCheckbox.pack(side=tk.LEFT)
-            tagCheckBoxes.append(tagCheckbox)
+        for i, opt in enumerate(self.cfg.options('tags')):
+            self.lastTagRow = i
+            tags = self.cfg.get('tags', opt)
+            tags = tags.split(',')
+            for j, tag in enumerate(tags):
+                val = tk.StringVar(value='0')
+                cbtn = ttk.Checkbutton(parent, text=tag, variable=val)
+                cbtn.meta = {'tag': tag, 'val': val}
+                tagCheckBoxes.append(cbtn)
+                cbtn.grid(row=i, column=j, sticky=tk.W)
+                if self.lastTagCol < j:
+                    self.lastTagCol = j
         return tagCheckBoxes
 
     def load_data(self):
         data = pd.read_csv(self.dataCsvPath, index_col='id') if path.exists(
-            self.dataCsvPath) else pd.DataFrame(
-                columns=['img'].extend(list(self.tagNames)))
-        if len(data.columns) > 0:
-            for tagName in self.tagNames:
-                if not tagName in data.columns:
-                    data[tagName] = pd.Series([], dtype=pd.Int64Dtype)
-                    data[tagName].fillna(0, inplace=True)
+            self.dataCsvPath) else pd.DataFrame()
         return data
 
     def update_data_from_file(self):
@@ -294,11 +276,18 @@ class App(tk.Tk):
         imgName = self.imgGenerator.get_img_name()
         if self.dataFrame.eq(imgName).any().any():
             data = self.dataFrame.loc[self.dataFrame.eq(imgName).any(axis=1)]
-            for tagName in self.tagNames:
-                self.tagNames[tagName].set(data[tagName].values[0])
+            for cbtn in self.tagCheckBoxes:
+                try:
+                    v = data[cbtn.meta['tag']]
+                    v = int(data[cbtn.meta['tag']]) if not v.isna().any() else 0
+                    cbtn.meta['val'].set(v)
+
+                    cbtn.meta['val'].set(v)
+                except KeyError:
+                    pass
         else:
-            for tagName in self.tagNames:
-                self.tagNames[tagName].set('0')
+            for cbtn in self.tagCheckBoxes:
+                cbtn.meta['val'].set(0)
 
     def update_all(self):
         self.update_img()
@@ -368,18 +357,15 @@ class App(tk.Tk):
         self.update_all()
 
     def tag_action(self):
-        tagDict = {
-            'img': self.imgGenerator.imgNameList[self.imgGenerator.index]
-        }
-        for tagName in self.tagNames:
-            tagDict[tagName] = int(self.tagNames[tagName].get())
-        self.dataFrame = pd.concat([
-            self.dataFrame,
-            pd.DataFrame(tagDict, index=[self.imgGenerator.index])
-        ],
-                                   ignore_index=True)
+        self.dataFrame.loc[self.imgGenerator.index,
+                           'img'] = self.imgGenerator.get_img_name()
+        for cb in self.tagCheckBoxes:
+            tag = cb.meta['tag']
+            val = cb.meta['val'].get()
+            self.dataFrame.loc[self.imgGenerator.index, tag] = float(val)
         self.dedupe_data()
         self.next_untaged()
+        self.save_csv_action()
 
     def next_untaged(self):
         for i, imgName in enumerate(self.imgGenerator.imgNameList):

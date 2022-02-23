@@ -18,3 +18,4 @@
 blinkserver/bin/
 *.key
 filestore/data/
+py_img_scorer/config.ini
