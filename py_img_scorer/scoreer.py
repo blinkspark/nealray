@@ -120,7 +120,9 @@ class App(tk.Tk):
             len(sys.argv) > 1 and os.path.exists(sys.argv[1])) else '.'
 
         self.dataCsvPath = path.join(self.workingDir, 'data.csv')
+        self.scoreCsvPath = path.join(self.workingDir, 'score.csv')
         self.dataFrame = self.load_data()
+        self.scoreData = self.load_score_data()
 
         self.imgGenerator = ImageGenerator(self.workingDir)
         self.currImg = self.imgGenerator.get_img()
@@ -135,12 +137,14 @@ class App(tk.Tk):
         self.infoFrame = self.info_frame(self.mainFrame)
         self.indexLabel = self.index_label(self.infoFrame)
         self.pathLabel = self.path_label(self.infoFrame)
+        self.scoreLabel = self.score_label(self.infoFrame)
         self.tagFrame = self.tag_frame(self.mainFrame)
         self.tagCheckBoxes = self.tag_checkboxes(self.tagFrame)
         self.tagBtn = self.tag_btn(self.tagFrame, self.tag_action)
 
-        self.next_untaged()
+        # self.next_untaged()
         # self.update_all()
+        self.next_unscored()
 
         self.bind('<Right>', lambda e: self.next_action())
         self.bind('<Left>', lambda e: self.prev_action())
@@ -148,6 +152,11 @@ class App(tk.Tk):
             '<Home>', lambda e:
             (self.imgGenerator.set_index(0), self.update_all()))
         self.bind('<Escape>', lambda e: self.quit())
+
+        #scores binding
+        self.bind('1', lambda e: self.set_score(1))
+        self.bind('2', lambda e: self.set_score(2))
+        self.bind('3', lambda e: self.set_score(3))
 
         self.bind('s', lambda e: self.save_csv_action())
 
@@ -292,6 +301,7 @@ class App(tk.Tk):
         self.update_index()
         self.update_path()
         self.update_tags()
+        self.update_score_label()
 
     def file_open_action(self):
         newDir = filedialog.askdirectory(initialdir=self.workingDir,
@@ -371,6 +381,43 @@ class App(tk.Tk):
                 self.imgGenerator.set_index(i)
                 self.update_all()
                 return
+
+    ######################## score ##############################
+    def load_score_data(self):
+        data = pd.read_csv(self.scoreCsvPath, index_col='img') if path.exists(
+            self.scoreCsvPath) else pd.DataFrame(
+                columns=['img', 'score']).set_index('img')
+        return data
+
+    def set_score(self, score):
+        imgName = self.imgGenerator.get_img_name()
+        self.scoreData.loc[imgName, 'score'] = score
+        self.scoreData.to_csv(self.scoreCsvPath, index_label='img')
+        self.next_unscored()
+
+    def next_unscored(self):
+        for i, imgName in enumerate(self.imgGenerator.imgNameList):
+            try:
+                self.scoreData.loc[imgName]
+            except KeyError:
+                self.imgGenerator.set_index(i)
+                self.update_all()
+                return
+
+    def score_label(self, parent):
+        scoreLabel = ttk.Label(parent, text='score: 0')
+        scoreLabel.pack(side=tk.LEFT)
+        return scoreLabel
+
+    def update_score_label(self):
+        try:
+            score = self.scoreData.loc[self.imgGenerator.get_img_name(),
+                                       'score']
+            self.scoreLabel.configure(text=f'score: {score}')
+        except KeyError:
+            self.scoreLabel.configure(text='score: 0')
+
+    ######################## score ##############################
 
 
 app = App()
