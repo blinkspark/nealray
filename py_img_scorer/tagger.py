@@ -1,5 +1,6 @@
 import sys
 import tkinter as tk, tkinter.ttk as ttk, tkinter.filedialog as filedialog
+from traceback import print_tb
 import numpy as np, pandas as pd
 from keras.models import load_model
 import os, os.path as path
@@ -41,6 +42,8 @@ class APP(tk.Tk):
         self.bind("<Left>", lambda e: self.prev_btn_action())
         self.bind("<Right>", lambda e: self.next_btn_action())
         self.bind("<Home>", lambda e: self.home_action())
+        self.bind("<Page_Down>", lambda e: self.next_untaged_img_action())
+        self.bind("<Page_Up>", lambda e: self.next_na_action())
 
         self.bind('1', lambda e: self.tag_action(1))
         self.bind('2', lambda e: self.tag_action(2))
@@ -86,6 +89,21 @@ class APP(tk.Tk):
         if path.exists(dataPath):
             os.remove(dataPath)
         self.set_index(0)
+
+    def next_untaged_img_action(self):
+        for i, imgName in enumerate(self.imgList):
+            try:
+                self.data.loc[imgName]
+            except KeyError:
+                self.set_index(i)
+                return
+
+    def next_na_action(self):
+        nas = self.data[ self.data['R18'].isna()]
+        if len(nas) <= 0:
+            return
+        self.set_index(self.imgList.index(nas.iloc[0].name))
+
 
     ##################### update #####################
     def update_all(self):
