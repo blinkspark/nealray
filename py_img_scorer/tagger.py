@@ -1,10 +1,12 @@
 import sys
 import tkinter as tk, tkinter.ttk as ttk, tkinter.filedialog as filedialog
 from traceback import print_tb
+from black import main
 import numpy as np, pandas as pd
 from keras.models import load_model
 import os, os.path as path
 from PIL import Image, ImageTk
+from concurrent.futures import ThreadPoolExecutor
 
 
 class APP(tk.Tk):
@@ -13,7 +15,7 @@ class APP(tk.Tk):
         super().__init__()
 
         self.workingDir = workingDir
-        self.tagNames = ['R18', 'Quality']
+        self.tagNames = ['R18', 'Quality', 'Fav']
 
         self.title("Tagger")
         self.mode = tk.StringVar(value=self.tagNames[0])
@@ -22,7 +24,7 @@ class APP(tk.Tk):
         self.load_data()
         self.imgList = list(self.img_list_generator())
 
-        ttk.Style().configure("TRadiobutton", font=(18))
+        ttk.Style().configure("TRadiobutton", font=(16))
         self.geometry("1200x900")
 
         self.main_menu()
@@ -99,11 +101,34 @@ class APP(tk.Tk):
                 return
 
     def next_na_action(self):
-        nas = self.data[ self.data['R18'].isna()]
+        nas = self.data[self.data[self.mode.get()].isna()]
         if len(nas) <= 0:
             return
+        print('next_na_action')
         self.set_index(self.imgList.index(nas.iloc[0].name))
 
+    def generate_ds_action(self):
+        dsDir = 'ds'
+        dsPath = path.join(self.workingDir, dsDir)
+        if not path.exists(dsPath):
+            os.mkdir(dsPath)
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            for imgName in self.imgList:
+                imgPath = path.join(self.workingDir, imgName)
+                targetPath = path.join(dsPath, imgName)
+                if path.exists(targetPath):
+                    continue
+                img = Image.open(imgPath)
+                executor.submit(self.proc_img, img, targetPath)
+        print('generate_ds_action done')
+
+    def proc_img(self, img, targetPath):
+        padSide = max(img.size)
+        padImg = Image.new('RGB', (padSide, padSide))
+        padImg.paste(img, (int(
+            (padSide - img.size[0]) / 2), int((padSide - img.size[1]) / 2)))
+        padImg = padImg.resize((224, 224), Image.BICUBIC)
+        padImg.save(targetPath, format='JPEG', quality=100)
 
     ##################### update #####################
     def update_all(self):
@@ -136,7 +161,6 @@ class APP(tk.Tk):
         if newSize[1] > winSize[1]:
             ratio = winSize[1] / newSize[1]
             newSize = (int(newSize[0] * ratio), int(newSize[1] * ratio))
-
         return newSize
 
     def load_img(self):
@@ -166,6 +190,9 @@ class APP(tk.Tk):
             except Exception as e:
                 label.configure(text=f'{tag}: {np.nan}')
 
+    def sort_data_action(self):
+        self.data = self.data.sort_index()
+
     ##################### data #####################
     def load_data(self):
         dataPath = path.join(self.workingDir, 'data.csv')
@@ -190,9 +217,17 @@ class APP(tk.Tk):
         fileMenu.add_command(label="Open")
         fileMenu.add_command(label="Save")
         fileMenu.add_command(label="Reset", command=self.reset_action)
+        fileMenu.add_command(label="Generate ds",
+                             command=self.generate_ds_action)
         fileMenu.add_separator()
         fileMenu.add_command(label="Exit", command=self.on_destroy_action)
         mainMenu.add_cascade(label="File", menu=fileMenu)
+
+        dataMenu = tk.Menu(mainMenu, tearoff=0)
+        dataMenu.add_command(label="Sort Data", command=self.sort_data_action)
+        dataMenu.add_command(label="Rewind Data",
+                             command=self.load_data)
+        mainMenu.add_cascade(label="Data", menu=dataMenu)
 
         self.config(menu=mainMenu)
         self.mainMenu = mainMenu

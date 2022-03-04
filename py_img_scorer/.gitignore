@@ -3,3 +3,5 @@
 *.pickle
 play.ipynb
 *.h5
+tmp/
+weights/
